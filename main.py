@@ -1,20 +1,16 @@
-import datetime
-import os
-import time
-
-import dropbox
+from point_gestion import *
 import json
 import discord
 from discord.ext import commands
 from discord.ext.commands import Context
 
-last_online_time = datetime.datetime.now()
-
-guild = 610807410952634368
+last_online_time = None
+guild = 610807410952634368  # ID du serveur
 token = os.environ.get('TOKENcarre')
 file = 'data.json'
 dbToken = os.environ.get('TOKENdbcarre')
-staff = 'ouioui'  # nom du rôle permettant les commande sup
+staff = 'ouioui'  # nom du rôle permettant les commandes speciales
+waitT = 24*3600  # temps entre 2 sauvegarde du fichier data.json vers dropbox
 
 defIntents = discord.Intents.default()
 defIntents.presences = True
@@ -25,88 +21,7 @@ bot = commands.Bot('!', intents=defIntents)
 bot.remove_command('help')
 
 
-def check_file_exists(filename):
-    current_directory = os.getcwd()
-    file_path = os.path.join(current_directory, filename)
-    if not os.path.exists(file_path):
-        with open(filename, 'w') as f:
-            json.dump({}, f)
-
-
-check_file_exists(file)
-
-
-def create_json_file(filename):
-    with open(filename, 'w') as f:
-        json.dump({}, f)
-
-
-# retourne 0 si le pseudo existe déjà
-def add_pseudo(filename, pseudo, amount=0):
-    with open(filename, 'r') as f:
-        data = json.load(f)
-        if pseudo in data:
-            return 0
-    data[pseudo] = amount
-    with open(filename, 'w') as f:
-        json.dump(data, f)
-
-
-# retourne 0 si le pseudo n'existe pas
-def remove_pseudo(filename, pseudo):
-    with open(filename, 'r') as f:
-        data = json.load(f)
-    if pseudo in data:
-        del data[pseudo]
-    else:
-        return 0
-    with open(filename, 'w') as f:
-        json.dump(data, f)
-
-
-def add_points(filename, iD: int, amount: int):
-    with open(filename, 'r') as f:
-        data = json.load(f)
-    if str(iD) in data.keys():
-        data[str(iD)] += amount
-        print(1)
-    else:
-        data[str(iD)] = amount
-        print(2)
-    with open(filename, 'w') as f:
-        json.dump(data, f)
-    return data[str(iD)]
-
-
-def checkpoints(filename, listId, amount):
-    with open(filename, 'r') as f:
-        data = json.load(f)
-    l1 = []
-    l2 = data.keys()
-    for iD in listId:
-        if str(iD) not in l2 or data[str(iD)] - amount < 0:
-            l1.append(iD)
-    return l1
-
-
-def remove_points(filename, iD, amount: int):
-    iD = str(iD)
-    with open(filename, 'r') as f:
-        data = json.load(f)
-    if iD in data:
-        print(2)
-        data[iD] -= amount
-        print(3)
-    else:
-        return 0
-    with open(filename, 'w') as f:
-        print(5)
-        json.dump(data, f)
-
-
 def has_role(role_name):
-    print('hasrole')
-
     async def predicate(ctx):
         role = discord.utils.get(ctx.guild.roles, name=role_name)
         return role in ctx.author.roles
@@ -114,8 +29,18 @@ def has_role(role_name):
     return commands.check(predicate)
 
 
+async def repeat_function():
+    while True:
+        print('test')
+        await upload(dbToken, file)
+        await asyncio.sleep(waitT)
+
+
 @bot.event
 async def on_ready():
+    global last_online_time
+    last_online_time = datetime.now()  # heurena laquelle le bot s'est mis en route
+    await repeat_function()
     print(f"Connecté en tant que {bot.user.name}")
 
 
@@ -131,6 +56,7 @@ async def ping(ctx):
 async def mespoints(ctx: commands.Context):
     with open(file, 'r') as f:
         data = json.load(f)
+        f.close()
     if str(ctx.author.id) not in data.keys():
         await ctx.send('vous avez 0 points')
     else:
@@ -191,16 +117,15 @@ async def addpoints(ctx: commands.Context, amount=None, target=None):
 @bot.command()
 @has_role(staff)
 async def points(ctx: commands.Context, target: str):
-    if not target.isdigit():
-        await ctx.send('ID invalide')
-        return
-    member = ctx.guild.get_member(int(target))
-    if member is None:
+    try:
+        target = int(target)
+        member = ctx.guild.get_member(target)
+    except ValueError:
         await ctx.send('ID invalide')
         return
     with open(file, 'r') as f:
         pts = json.load(f).get(target, 0)
-
+        f.close()
     nick = member.nick if member.nick else member.name
     await ctx.send(f"Le membre {nick} a {pts} points")
 
