@@ -10,11 +10,11 @@ from discord.ext.commands import Context
 
 last_online_time = datetime.datetime.now()
 
-guild = 610807410952634368
+guild = 610807410952634368 # ID du serveur
 token = os.environ.get('TOKENcarre')
 file = 'data.json'
 dbToken = os.environ.get('TOKENdbcarre')
-staff = 'ouioui'  # nom du rôle permettant les commande sup
+staff = 'ouioui'  # nom du rôle permettant les commandes speciales
 
 defIntents = discord.Intents.default()
 defIntents.presences = True
