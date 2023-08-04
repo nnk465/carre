@@ -1,5 +1,7 @@
 import datetime
 import os
+import time
+
 import dropbox
 import json
 import discord
@@ -7,23 +9,31 @@ from discord.ext import commands
 from discord.ext.commands import Context
 
 last_online_time = datetime.datetime.now()
+
+guild = 610807410952634368
 token = os.environ.get('TOKENcarre')
-roles = {'chef': 1136243683696574575, 'prof': 1136243683696574575, 'modo': 1136243683696574575,
-         'staf': 1136243683696574575}
 file = 'data.json'
 dbToken = os.environ.get('TOKENdbcarre')
+staff = 'ouioui'  # nom du rôle permettant les commande sup
 
 defIntents = discord.Intents.default()
 defIntents.presences = True
 defIntents.members = True
 defIntents.message_content = True
 
+bot = commands.Bot('!', intents=defIntents)
+bot.remove_command('help')
+
 
 def check_file_exists(filename):
     current_directory = os.getcwd()
     file_path = os.path.join(current_directory, filename)
-    if os.path.exists(file_path):
-        return True
+    if not os.path.exists(file_path):
+        with open(filename, 'w') as f:
+            json.dump({}, f)
+
+
+check_file_exists(file)
 
 
 def create_json_file(filename):
@@ -94,27 +104,15 @@ def remove_points(filename, iD, amount: int):
         json.dump(data, f)
 
 
-def check_role(roleIdList, auth: discord.Member):
-    for rl in roleIdList:
-        for r in auth.roles:
-            print(r.id, rl)
-            if r.id == rl:
-                print('membre identifié')
-                return True
-    return False
-
-
-if not check_file_exists(file):
-    create_json_file(file)
-
-bot = commands.Bot('!', intents=defIntents)
-
-
 def has_role(role_name):
+    print('hasrole')
+
     async def predicate(ctx):
         role = discord.utils.get(ctx.guild.roles, name=role_name)
         return role in ctx.author.roles
+
     return commands.check(predicate)
+
 
 @bot.event
 async def on_ready():
@@ -122,10 +120,30 @@ async def on_ready():
 
 
 @bot.command()
-@has_role('ouioui')
+async def ping(ctx):
+    latency = bot.latency * 1000  # Convertir en millisecondes
+    embed = discord.Embed(title='Pong!', description=f'temps de latence: {latency:.2f} ms',
+                          color=discord.Color.brand_green())
+    await ctx.send(embed=embed)
+
+
+@bot.command()
+async def mespoints(ctx: commands.Context):
+    with open(file, 'r') as f:
+        data = json.load(f)
+    if str(ctx.author.id) not in data.keys():
+        await ctx.send('vous avez 0 points')
+    else:
+        await ctx.send(f"vous avez {data[str(ctx.author.id)]} points")
+
+
+@bot.command()
+@has_role(staff)
 async def rmpoints(ctx: Context, amount, target=None):
-    if not check_role([roles['chef'], roles['prof']], ctx.message.author):
-        await ctx.send("vous n'avez pas le rôle requis pour effectuer cette action")
+    try:
+        member = ctx.guild.get_member(int(target))
+    except ValueError:
+        member = None
     if target is None:
         vc = bot.get_channel(ctx.channel.id)
         if vc.__class__ != discord.VoiceChannel:
@@ -148,41 +166,31 @@ async def rmpoints(ctx: Context, amount, target=None):
             await ctx.send(f"le(s) membre(s) {','.join(nameList)} n'ont pas assez de points")
     elif not checkpoints(file, [target], int(amount)):
         remove_points(file, target, int(amount))
-    elif not ctx.guild.get_member(int(target)):
+    elif not member:
         await ctx.send(f"aucun membre n'a l'id {target}")
     else:
-        member = ctx.guild.get_member(int(target))
         await ctx.send(f"le membre {member.nick if member.nick else member.global_name} a moins de {amount} points")
 
+
 @bot.command()
-@has_role('ouioui')
-async def addpoints(ctx: commands.Context, amount, target):
-    if not check_role([roles['chef'], roles['modo']], ctx.message.author):
-        await ctx.send("vous n'avez pas le rôle requis pour effectuer cette action")
-    elif not ctx.guild.get_member(int(target)):
-        await ctx.send(f"aucun membre n'a l'id {target}")
-    else:
+@has_role(staff)
+async def addpoints(ctx: commands.Context, amount=None, target=None):
+    try:
         member = ctx.guild.get_member(int(target))
-        await ctx.send(
-            f"{member.nick if member.nick else member.global_name} a désormais {add_points(file, int(target), int(amount))} points")
-
-
-@bot.command()
-async def mespoints(ctx: commands.Context):
-    with open(file, 'r') as f:
-        data = json.load(f)
-    if str(ctx.author.id) not in data.keys():
-        await ctx.send('vous avez 0 points')
-    else:
-        await ctx.send(f"vous avez {data[str(ctx.author.id)]} points")
-
-
-@bot.command()
-@has_role('ouioui')
-async def points(ctx: commands.Context, target: str):
-    if not check_role(list(roles.values()), ctx.author):
-        await ctx.send("vous n'avez pas le rôle nécessaire pour effectuer cette action")
+    except ValueError:
+        await ctx.send(f"aucun membre n'a l'id {target}")
         return
+    if not amount or not target or not amount.isdigit:
+        await ctx.send(
+            "il semble y avoir une erreure dans la syntaxe de la commande, utilisez !help pour plus d'information")
+        return
+    await ctx.send(
+        f"{member.nick if member.nick else member.global_name} a désormais {add_points(file, int(target), int(amount))} points")
+
+
+@bot.command()
+@has_role(staff)
+async def points(ctx: commands.Context, target: str):
     if not target.isdigit():
         await ctx.send('ID invalide')
         return
@@ -198,28 +206,30 @@ async def points(ctx: commands.Context, target: str):
 
 
 @bot.command()
-@has_role('ouioui')
+@has_role(staff)
 async def connectHour(ctx):
     await ctx.send(f'en ligne depuis le {last_online_time.strftime("%d/%m à %Hh%M")}')
 
 
-@bot.command(help='vous affiche une description des commandes')
-async def aide(ctx: commands.Context):
-    if check_role([roles['staf']], ctx.author):
-        pass
-    await ctx.send("!rmpoint N ID   --> retire N points au membre ayant l'id ID. si ID n'est pas précisé, cela retire "
-                   "N points a tous les membres present dans le canal (cette fonction est disponible uniquement dans les canaux vocaux)\n"
-                   "-----------------------------------------------\n"
-                   "!addpoints N ID --> ajoute N points au membre ayant l'id ID.\n"
-                   "-----------------------------------------------\n "
-                   "!connectHour    --> affiche le jour et l'heure de connection du bot\n"
-                   "-----------------------------------------------\n ")
-    await ctx.send(
-        "!mespoints      --> affiche votre nombe de points\n"
-        "-----------------------------------------------\n"
-        "!points ID     --> affiche le nombre de points de l'utilisateur ayant l'id ID\n"
-        "-----------------------------------------------\n"
-        "!aide           --> affiche la liste des commandes avec leur description")
+@bot.command()
+async def help(ctx: commands.Context):
+    t = time.time()
+    embed = discord.Embed(colour=discord.Colour.teal())
+    embed.set_author(name='Liste des commandes')
+    embed.add_field(name='!mespoints', value="affiche votre nombre de points", inline=False)
+    embed.add_field(name='!aide', value="affiche ce message", inline=False)
+    for role in ctx.bot.get_guild(guild).get_member(ctx.author.id).roles:
+        if role.name == staff:
+            embed.add_field(name='!rmpoints N ID',
+                            value="retire N points au membre ayant l'id ID. si ID n'est pas précisé, cela retire "
+                                  "N points a tous les membres present dans le canal (cette fonction est disponible uniquement dans les canaux vocaux)",
+                            inline=False)
+            embed.add_field(name='!addpoints N ID', value="ajoute N points au membre ayant l'id ID.", inline=False)
+            embed.add_field(name='!connectHour', value="affiche le jour et l'heure de connection du bot", inline=False)
+            embed.add_field(name='!points ID', value="affiche le nombre dde points de l'utilisateur ayant l'id ID",
+                            inline=False)
+    await ctx.author.send(embed=embed)
+    print(time.time() - t)
 
 
 bot.run(token)
