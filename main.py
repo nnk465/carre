@@ -1,20 +1,16 @@
-import datetime
-import time
 from point_gestion import *
-import dropbox
 import json
 import discord
 from discord.ext import commands
 from discord.ext.commands import Context
 
-
-last_online_time = datetime.datetime.now()
-
-guild = 610807410952634368 # ID du serveur
+last_online_time = None
+guild = 610807410952634368  # ID du serveur
 token = os.environ.get('TOKENcarre')
 file = 'data.json'
 dbToken = os.environ.get('TOKENdbcarre')
 staff = 'ouioui'  # nom du rôle permettant les commandes speciales
+waitT = 24*3600  # temps entre 2 sauvegarde du fichier data.json vers dropbox
 
 defIntents = discord.Intents.default()
 defIntents.presences = True
@@ -26,8 +22,6 @@ bot.remove_command('help')
 
 
 def has_role(role_name):
-    print('hasrole')
-
     async def predicate(ctx):
         role = discord.utils.get(ctx.guild.roles, name=role_name)
         return role in ctx.author.roles
@@ -35,8 +29,18 @@ def has_role(role_name):
     return commands.check(predicate)
 
 
+async def repeat_function():
+    while True:
+        print('test')
+        await upload(dbToken, file)
+        await asyncio.sleep(waitT)
+
+
 @bot.event
 async def on_ready():
+    global last_online_time
+    last_online_time = datetime.now()  # heurena laquelle le bot s'est mis en route
+    await repeat_function()
     print(f"Connecté en tant que {bot.user.name}")
 
 
@@ -52,6 +56,7 @@ async def ping(ctx):
 async def mespoints(ctx: commands.Context):
     with open(file, 'r') as f:
         data = json.load(f)
+        f.close()
     if str(ctx.author.id) not in data.keys():
         await ctx.send('vous avez 0 points')
     else:
@@ -120,7 +125,7 @@ async def points(ctx: commands.Context, target: str):
         return
     with open(file, 'r') as f:
         pts = json.load(f).get(target, 0)
-
+        f.close()
     nick = member.nick if member.nick else member.name
     await ctx.send(f"Le membre {nick} a {pts} points")
 
