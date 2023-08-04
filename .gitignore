@@ -1,3 +1,5 @@
 venv
 data.json
 .idea
+test.py
+__pycache__
