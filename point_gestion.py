@@ -1,9 +1,6 @@
-import asyncio
 from datetime import datetime
 import os
 import json
-import time
-
 import dropbox
 
 '''
@@ -85,33 +82,23 @@ def remove_points(filename, iD, amount: int):
     else:
         return 0
     with open(filename, 'w') as f:
-        print(5)
         json.dump(data, f)
         f.close()
 
 
-def upload_to_dropbox(file_path, access_token, destination_path):
-    dbx = dropbox.Dropbox(access_token)
-
-    with open(file_path, 'rb') as f:
-        try:
-            dbx.files_upload(f.read(), destination_path)
-            print("Fichier téléversé avec succès dans Dropbox.")
-        except dropbox.dropbox_client.ApiError as e:
-            print("Une erreur s'est produite lors du téléversement :", e)
-        f.close()
-
-
-async def upload(token, file):
+async def upload(channel, token, file):
     print('upload')
     dbx = dropbox.Dropbox(token)
-
-    destination_path = f'/data{datetime.now().strftime("%d/%m à %H:%M")}.json'  # Nouveau chemin de destination avec le nouveau nom de fichier
+    destination_path = f'/data{datetime.now().strftime("%d %m à %H:%M")}.json'  # Nouveau chemin de destination avec le nouveau nom de fichier
 
     with open(file, 'rb') as f:
         try:
             dbx.files_upload(f.read(), destination_path)
-            print("Fichier téléversé avec succès dans Dropbox.")
+            await channel.send("Fichier téléversé avec succès dans Dropbox.")
         except dropbox.dropbox_client.ApiError as e:
-            print("Une erreur s'est produite lors du téléversement :", e)
+            await channel.send(f"Une erreur s'est produite lors du téléversement :{e}")
         f.close()
+
+
+def error_message_pseudo(pseudo):
+    return f"aucun membre possède le pseudo {pseudo}"
