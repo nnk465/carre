@@ -67,8 +67,6 @@ async def on_ready():
     print(f"Connecté en tant que {bot.user.name}\non ready en {time.time() - t} sec")
     bot.tree.copy_global_to(guild=bot.get_guild(610807410952634368))
     await bot.tree.sync(guild=bot.get_guild(610807410952634368))
-
-
 #    await repeat_function()
 
 
@@ -76,10 +74,14 @@ async def autocompletion(interaction: discord.Interaction,
                          current: str):
     data = []
     key_list = []
-    if interaction.command.name in ['hello', 'addpoints', 'info']:
+    role = interaction.command.name
+    if role in ['hello', 'addpoints', 'info']:
         key_list = namelist
-    if interaction.command.name == 'rmpoints':
-        key_list = p
+    if role == 'rmpoints':
+        key_list = namelist
+        if 'salon_vocal' not in str(key_list):
+            key_list.append('salon_vocal')
+
     for i in key_list:
         if i.lower().startswith(current.lower()):
             data.append(discord.app_commands.Choice(name=i, value=i))
@@ -192,13 +194,17 @@ async def info(interaction: discord.Interaction, name: str):
     with open(file, 'r') as f:
         pts = json.load(f).get(iD, 0)
         f.close()
-    print(bot.guilds)
     nick = member.nick if member.nick else member.name
     embed = discord.Embed(colour=discord.Colour.teal())
     embed.set_author(name='!points')
     embed.set_thumbnail(url=member.default_avatar.url)
+    if member.bot:
+        text = f'bot {nick}\na rejoint le seveur le {member.joined_at.strftime("%d/%m à %H:%M")}\nrôles: {",".join([r.name for r in member.roles])}'
+    else:
+        text = f'{pts} points\na rejoint le seveur le {member.joined_at.strftime("%d/%m à %H:%M")}\nrôles: {",".join([r.name for r in member.roles])}'
+
     embed.add_field(name=nick,
-                    value=f'{pts} points\na rejoint le seveur le {member.joined_at.strftime("%d/%m à %H:%M")}\nrôles: {",".join([r.name for r in member.roles])}')
+                    value=text)
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
